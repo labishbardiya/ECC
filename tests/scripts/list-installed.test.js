@@ -20,6 +20,7 @@ const {
   createInstallState,
   writeInstallState,
 } = require('../../scripts/lib/install-state');
+const { fixtureHomeEnv, withExternalOpenCodeInstall } = require('../lib/helpers/install-state-cli-fixture');
 
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -34,15 +35,12 @@ function writeState(filePath, options) {
   writeInstallState(filePath, state);
 }
 
-function run(args = [], options = {}) {
-  const env = {
-    ...process.env,
-    HOME: options.homeDir || process.env.HOME,
-  };
+function run(args, { cwd, homeDir, env: inheritedEnv }) {
+  const env = fixtureHomeEnv(homeDir, { ...process.env, ...inheritedEnv });
 
   try {
     const stdout = execFileSync('node', [SCRIPT, ...args], {
-      cwd: options.cwd,
+      cwd,
       env,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -82,9 +80,11 @@ function runTests() {
     const projectRoot = createTempDir('list-installed-project-');
 
     try {
-      const result = run([], { cwd: projectRoot, homeDir });
-      assert.strictEqual(result.code, 0);
-      assert.ok(result.stdout.includes('No ECC install-state files found'));
+      withExternalOpenCodeInstall(env => {
+        const result = run([], { cwd: projectRoot, homeDir, env });
+        assert.strictEqual(result.code, 0);
+        assert.ok(result.stdout.includes('No ECC install-state files found'));
+      });
     } finally {
       cleanup(homeDir);
       cleanup(projectRoot);
